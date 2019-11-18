@@ -1,4 +1,7 @@
 
+#ifndef BLOCKING_QUEUE_H
+#define BLOCKING_QUEUE_H
+
 #include <atomic>
 #include <condition_variable>
 #include <mutex>
@@ -92,3 +95,5 @@ class BlockingQueue {
   Node* tail_;
   std::atomic<size_t> size_;
 };
+
+#endif
