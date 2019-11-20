@@ -31,7 +31,7 @@ class BlockingQueue {
   }
 
   bool TryDequeue(T& value) {
-    std::lock_guard<std::mutex> lk(head_mutex_);
+    std::unique_lock<std::mutex> lk(head_mutex_);
     if (head_ == get_tail()) {
       return false;
     }
@@ -39,6 +39,8 @@ class BlockingQueue {
     Node* old_head = head_;
     value = std::move(old_head->value);
     head_ = old_head->next;
+    lk.unlock();
+
     size_.fetch_sub(1, std::memory_order_release);
     delete old_head;
     return true;
@@ -51,6 +53,8 @@ class BlockingQueue {
     Node* old_head = head_;
     T value = std::move(old_head->value);
     head_ = old_head->next;
+    lk.unlock();
+
     size_.fetch_sub(1, std::memory_order_release);
     delete old_head;
     return value;
