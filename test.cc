@@ -1,18 +1,15 @@
 #include "blocking_queue.h"
 
+#include <cassert>
 #include <chrono>
-#include <cstdio>
 #include <iostream>
 #include <unordered_map>
 #include <thread>
-#include <cassert>
-
-#define MAX_THREADS 4
 
 int maxElements = 1000000;
 BlockingQueue<int> q;
-std::atomic<int> cnt = 0;
-std::atomic<bool> start = false;
+std::atomic<int> cnt(0);
+std::atomic<bool> start(false);
 std::unordered_map<int, int*> elements2timespan;
 
 auto enqueue_func = [](int divide) {
@@ -117,11 +114,51 @@ void TestConcurrentEnqueueAndDequeue() {
   start = false;
 }
 
+std::unordered_map<int, int> element2count1;
+std::unordered_map<int, int> element2count2;
+
+auto dequeue_func_with_count = [](std::unordered_map<int, int>& element2count) {
+  while (!start) {
+    std::this_thread::yield();
+  }
+  int x;
+  for (; cnt.load(std::memory_order_relaxed) < maxElements;) {
+    if (q.TryDequeue(x)) {
+      cnt.fetch_add(1, std::memory_order_relaxed);
+      ++element2count[x];
+    }
+  }
+};
+void TestCorrectness() {
+  for (int i = 0; i < maxElements / 2; ++i) {
+    element2count1[i] = 0;
+    element2count2[i] = 0;
+  }
+
+  maxElements = 1000000;
+  std::thread t1(enqueue_func, 2);
+  std::thread t2(enqueue_func, 2);
+  std::thread t3(dequeue_func_with_count, std::ref(element2count1));
+  std::thread t4(dequeue_func_with_count, std::ref(element2count2));
+  cnt = 0;
+  start = true;
+
+  t1.join();
+  t2.join();
+  t3.join();
+  t4.join();
+
+  assert(static_cast<int>(q.size()) == 0 && cnt == maxElements);
+  for (int i = 0; i < maxElements / 2; ++i) {
+    assert(element2count1[i] + element2count2[i] == 2);
+  }
+}
+
 int main(int argc, char const* argv[]) {
   (void)argc;
   (void)argv;
 
-  std::cout << "Benchmark with " << MAX_THREADS << " 4 threads:"
+  std::cout << "Benchmark with 4 threads:"
             << "\n";
 
   int elements[] = {10000, 100000, 1000000};
@@ -162,6 +199,8 @@ int main(int argc, char const* argv[]) {
               << "\n";
     std::cout << "\n";
   }
+
+  TestCorrectness();
 
   return 0;
 }

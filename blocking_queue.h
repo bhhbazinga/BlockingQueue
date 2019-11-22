@@ -16,6 +16,10 @@ class BlockingQueue {
       ;
     delete head_;
   }
+  BlockingQueue(const BlockingQueue& other) = delete;
+  BlockingQueue(BlockingQueue&& other) = delete;
+  BlockingQueue& operator=(const BlockingQueue& other) = delete;
+  BlockingQueue& operator=(BlockingQueue&& other) = delete;
 
   void Enqueue(const T& value) {
     std::lock_guard<std::mutex> lk(tail_mutex_);
